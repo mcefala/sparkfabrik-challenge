@@ -1,0 +1,292 @@
+
+<script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-app.js"></script>
+<!-- TODO: Add SDKs for Firebase products that you want to use
+     https://firebase.google.com/docs/web/setup#available-libraries -->
+<script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-analytics.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.0.2/firebase-firestore.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700|Material+Icons">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.0/angular.min.js"></script>
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css"
+    integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+<div class="jumbotron" style="background-color: #d7edff; color: #113f65; height: 200px;">
+    <h1>QUOTES</h1>
+</div>
+<div class="container" ng-app="quotes-app" ng-controller="Ctrl" ng-init="init()">
+
+    <div style="position:fixed; top:5; right: 45; width: 300px; z-index: 1000;" class="toast" id="copyToast"
+        role="alert" aria-live="assertive" aria-atomic="true" data-delay="1500">
+        <div class="toast-header">
+            <strong class="mr-auto">Quote copied to clipboard</strong>
+            <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    </div>
+    <!-- LOGIN -->
+
+    <div ng-if="!uid" style="margin-top: 50px;">
+        <form ng-submit="login(true)" style="max-width: 400px; margin: auto;">
+            <br>
+            <div class="md-form md-outline">
+                <input placeholder="Email" ng-model="$parent.email" type="text" class="form-control">
+            </div>
+            <br>
+            <div class="md-form md-outline">
+                <input placeholder="Password" ng-model="$parent.password" type="password" class="form-control">
+                <br>
+                <button type="submit" class="btn btn-raised btn-info">Login</button>
+        </form>
+        <button type="button" ng-click="login(false)" class="btn btn-raised btn-info">SignUp</button>
+    </div>
+    <div style="display: none;" id="error" class="alert alert-danger"></div>
+</div>
+<!-- ENDLOGIN -->
+<div ng-if="uid" style="margin-top: 50px;">
+    <div align="right">
+        <div style="  left: 50%;
+        position: fixed;z-index: 1000; transform: translate(-50%, 0px);background: lightgreen;" class=" toast"
+            id="quoteToast" role="alert" aria-live="assertive" aria-atomic="true" data-autohide="false">
+            <div class="toast-header">
+                <div class="row" style="width: 125%;">
+                    <button type="button" ng-click="addNewQuote(true)" class="col-1 ml-2 mb-1 close"
+                        data-dismiss="toast" aria-label="Close">
+                        <i class="fa fa-save"></i>
+                    </button>
+                    <strong class="col">An awesome quote for you</strong>
+                    <button type="button" class="col-1 ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            </div>
+            <div class="toast-body" align="right">
+                <strong>{{random.quote}}</strong>
+                <p class="card-text">{{random.author}}</p>
+            </div>
+        </div>
+    </div>
+    <form ng-submit="addNewQuote()" style="margin: auto;">
+        <div class="md-form">
+            <textarea class="form-control" ng-model="$parent.quote.quote" placeholder="Your New Quote"
+                rows="3"></textarea>
+            <input style="margin-top:20px" placeholder="Author" ng-model="$parent.quote.author" type="text"
+                class="form-control">
+            <button style="margin-top:20px" type="submit" class="btn btn-raised btn-info btn-block">ADD NEW
+                QUOTE</button>
+        </div>
+    </form>
+    <br>
+    <div align=right>
+        <input ng-model="crit" ng-change="search(crit)" placeholder="Search">
+    </div>
+    <br>
+    <div class=container>
+        <div class="row" ng-repeat="item in quotesview">
+            <div class="col-11 card text-right border-info mb-3">
+                <div class="card-body">
+                    <h4 class="card-title">{{item.data().quote}}</h4>
+                    <p class="card-text">{{item.data().author}}</p>
+                </div>
+            </div>
+            <div class="col-1" style="display:block; margin-left: -10px">
+                <button style="width:35px; height:35px;" ng-click="copyToClipboard(item)" type="button"
+                    class="btn btn-outline-info">
+                    <i class="fa fa-clipboard"></i></button>
+                <button style="width:35px; height: 35px;  margin-top: 5px;" ng-click="delete(item)" type="button"
+                    class="btn btn-outline-danger"><i class="fa fa-trash"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+
+
+<script>
+    var app = angular.module('quotes-app', []);
+    app.controller('Ctrl', ['$scope', '$timeout', '$http', function ($scope, $timeout, $http) {
+        const quotesurl = "https://type.fit/api/quotes";
+        var quotes = []
+        $scope.user = {};
+        $scope.quotesview = [];
+        $scope.loading = false;
+        $scope.init = function () {
+            getRandomQuote()
+            // Your web app's Firebase configuration
+            // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+            var firebaseConfig = {
+                apiKey: "AIzaSyAc0X6Oy_oxG3f1D83slkirAZBAvZMzCH0",
+                authDomain: "sparkfabrik-assignment.firebaseapp.com",
+                databaseURL: "https://sparkfabrik-assignment.firebaseio.com",
+                projectId: "sparkfabrik-assignment",
+                storageBucket: "sparkfabrik-assignment.appspot.com",
+                messagingSenderId: "130071964387",
+                appId: "1:130071964387:web:8d01a904bcf8b0e04f73d6",
+                measurementId: "G-DMT0X3PYC6"
+            };
+
+            // Initialize Firebase
+            var defaultProject = firebase.initializeApp(firebaseConfig);
+            console.log(defaultProject.name)
+
+        }
+        $scope.login = (value) => {
+            console.log(value);
+            console.log("login")
+            var params = {
+                email: $scope.email,
+                password: $scope.password
+            }
+            try {
+                $scope.loading = true;
+                if (value) {
+                    firebase.auth().signInWithEmailAndPassword(params.email, params.password).then((p) => {
+                        setUid(p.user.uid);
+                        $scope.user = p.user;
+                        $scope.loading = false;
+                        getData();
+                    }, (error) => {
+                        setError(error)
+                        $scope.loading = false;
+                    }).finally(() => {
+                        $scope.$digest();
+                        $('#quoteToast').toast("show");
+                    })
+                }
+                else {
+                    firebase.auth().createUserWithEmailAndPassword(params.email, params.password).then((p) => {
+                        setUid(p.user.uid);
+                        $scope.user = p.user;
+                        $scope.loading = false;
+                        getData();
+                    }, (error) => {
+                        setError(error)
+                        $scope.loading = false;
+                    }).finally(() => {
+                        $scope.$digest();
+                        $('#quoteToast').toast("show");
+                    })
+                }
+            } catch (error) {
+                setError(error)
+                console.log(error.message);
+                $scope.loading = false;
+            }
+
+        }
+
+        function setError(error) {
+            //document.getElementById("error").innerHTML = error.message;
+            document.getElementById("error").style.display = "block"; document.getElementById("error").innerHTML = error.message;
+        }
+        function setResponse(response) {
+            document.getElementById("response").style.display = "block"; document.getElementById("response").innerHTML = response
+        }
+        function setUid(value) {
+            $scope.uid = value
+        }
+
+        $scope.addNewQuote = (value) => {
+            let origin = $scope.quote;
+            console.log(origin);
+            let db = firebase.firestore();
+            if (value) {
+                origin = $scope.random
+            }
+            let author = origin.author
+            if (!author)
+                author = 'anonymous'
+            console.log(origin);
+
+            let params = {
+                author,
+                quote: origin.quote,
+                timestamp: new Date().getTime()
+            }
+            db.collection($scope.uid).add(params).then((value) => { console.log(`${(value)} written`); getData(); clearfields() },
+                (error) => console.log(error));
+        };
+
+
+        $scope.search = (value) => {
+            let filtered = []
+            if (value.length === 0) {
+                $scope.quotesview = [];
+                filtered = [];
+                getData();
+            }
+            if (value.length > 2) {
+                let criteria = value.split(" ")
+                for (var i in criteria) {
+                    filtered = quotes.filter(item => {
+                        console.log("qui", item.data());
+                        if (filtered.indexOf(item) > -1) return true;
+                        return item.data().quote.toLowerCase().includes(criteria[i].toLowerCase()) > 0 || item.data().author.toLowerCase().includes(criteria[i].toLowerCase()) > 0
+                    })
+                    console.log(filtered);
+                }
+                $scope.quotesview = filtered;
+            }
+        }
+
+        $scope.copyToClipboard = function (item) {
+            var textArea = document.createElement("textarea");
+            textArea.value = `${item.data().quote}\n(${item.data().author})`;
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            $scope.copy = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            if ($scope.copy) {
+                $('#copyToast').toast("show");
+            }
+        }
+
+        $scope.delete = (item) => {
+            let db = firebase.firestore();
+            db.collection($scope.uid).doc(item.id).delete().then(() => {
+                console.log("Document successfully deleted!");
+            }, (error) => { console.log(`error in delete ${error}`) }).finally(() => {
+                getData();
+            });
+        }
+
+        function getData() {
+            let results = []
+            $scope.quotesview = [];
+            let db = firebase.firestore();
+            db.collection($scope.uid).get().then((querySnapshot) => {
+                querySnapshot.forEach(item => {
+                    results.push(item)
+                    results.sort((a, b) => (a.data().timestamp > b.data().timestamp) ? -1 : ((b.data().timestamp > a.data().timestamp) ? 1 : 0));
+                    quotes = results;
+                    $scope.quotesview = quotes;
+                })
+            }, (error) => { console.log(error) }).finally(() => { $scope.$digest(); console.log($scope.quotesview) });
+        }
+
+        function getRandomQuote() {
+            $scope.random = {};
+            $http.get("https://type.fit/api/quotes").then(success => {
+                let randvar = Math.floor(Math.random() * success.data.length);
+                $scope.random = {
+                    quote: success.data[randvar].text,
+                    author: success.data[randvar].author,
+                }
+            });
+        }
+
+        function clearfields() {
+            delete $scope.quote;
+            delete $scope.author;
+        }
+    }]);
+</script>
